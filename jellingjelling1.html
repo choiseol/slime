@@ -1,0 +1,289 @@
+<idoctype html>
+<head>
+	<meta charset = "utf-8">
+	<link href='normalize.css' rel="stylesheet">
+	<script src="scrollByAnimated.js"></script>
+	<link href='https://spoqa.github.io/spoqa-han-sans/css/SpoqaHanSans-kr.css' rel='stylesheet' type='text/css'>
+	
+
+
+
+	<style>
+	footer{}
+	p{color: white; font-size: 1.5em; line-height:15px;}
+	h1{color: white; font-size: 3.6em;}
+	h2{color: white; font-size: 3em;}
+	h3{color: white; font-size: 1.5em; font-weight:400; line-height: 20px}
+
+	#logo{top: 300px; left: 400px; position: absolute;width:600px; z-index: 101;}
+	body{background:url('./jell_div.jpg'); background-size:1400px auto; background-repeat: no-repeat; height: 6450px; margin:0 auto;}
+	header #menu {float:right; width:300px; list-style: none; margin-right:80px; margin-top: -400px; position: fixed; z-index: 101}
+	header #menu li{float:left; margin-right: 50px;}
+	header #m1{width:90px; height: 60px; background: url(./button_univ.svg);}
+	header #m2{width:68px; height: 70px; background: url(./button_duck.svg);}
+	footer{ margin-top: 600px; float: left; margin-left:250px; font-size: 0.8em;}
+	
+	article section{margin-top: 800px; margin-left: 100px;}
+	article #op{margin-top: 460px; margin-left: 410px;}
+	article #first{margin-top: 350px; margin-left: 200px;}
+	article #making{margin-top: 370px; margin-left: 200px;}
+	article #s1{margin-top:650px; margin-left:850px;}
+	article #s2{ margin-top:500px; margin-left: 250px;}
+	article #s3{margin-top:450px; margin-left: 250px;}
+	article #s4{margin-top:550px; margin-left: 850px;}
+	article #s5{margin-top:450px; margin-left: 250px;}
+	article #s6{margin-top:500px; margin-left: 850px;}
+	article #s7{margin-top:800px; margin-left:525px;}
+	article #slime1{width: 500px; position: absolute; margin-left: 600px; transform: perspective(1600px) rotateX(0deg) rotateY(0deg) rotateZ(0deg) scaleX(1) scaleY(1) translate3d(0, 0, 0); transform-style: preserve-3d; transition: all 0.8s cubic-bezier(0.4, 0.62, 0, 1); }
+	#s7 img{position: absolute; width: 600; margin-left: -140px; margin-top: -130px;}
+	#s7 h1{position: absolute;}
+
+
+
+
+	</style>
+
+<!-- Load the Paper.js library -->
+<script type="text/javascript" src="paper.js"></script>
+<!-- Load external PaperScript and associate it with myCanvas -->
+<script type="text/paperscript" canvas="myCanvas">
+
+function randomH(min, max) {
+  	min = Math.ceil(min);
+  	max = Math.floor(max);
+  	return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+// kynd.info 2014
+
+function Ball(r, p, v) {
+	this.radius = r;
+	this.point = p;
+	this.vector = v;
+	this.maxVec = 15;
+	this.numSegment = Math.floor(r / 3 + 2);
+	this.boundOffset = [];
+	this.boundOffsetBuff = [];
+	this.sidePoints = [];
+	this.path = new Path({
+		fillColor: {
+			hue: randomH(250,310),
+			saturation: 1,
+			brightness: 1
+		},
+		blendMode: 'lighter'
+	});
+
+	for (var i = 0; i < this.numSegment; i ++) {
+		this.boundOffset.push(this.radius);
+		this.boundOffsetBuff.push(this.radius);
+		this.path.add(new Point());
+		this.sidePoints.push(new Point({
+			angle: 360 / this.numSegment * i,
+			length: 1
+		}));
+	}
+}
+
+Ball.prototype = {
+	iterate: function() {
+		this.checkBorders();
+		if (this.vector.length > this.maxVec)
+			this.vector.length = this.maxVec;
+		this.point += this.vector;
+		this.updateShape();
+	},
+
+	checkBorders: function() {
+		var size = view.size;
+		if (this.point.x < -this.radius)
+			this.point.x = size.width + this.radius;
+		if (this.point.x > size.width + this.radius)
+			this.point.x = -this.radius;
+		if (this.point.y < -this.radius)
+			this.point.y = size.height + this.radius;
+		if (this.point.y > size.height + this.radius)
+			this.point.y = -this.radius;
+	},
+
+	updateShape: function() {
+		var segments = this.path.segments;
+		for (var i = 0; i < this.numSegment; i ++)
+			segments[i].point = this.getSidePoint(i);
+
+		this.path.smooth();
+		for (var i = 0; i < this.numSegment; i ++) {
+			if (this.boundOffset[i] < this.radius / 4)
+				this.boundOffset[i] = this.radius / 4;
+			var next = (i + 1) % this.numSegment;
+			var prev = (i > 0) ? i - 1 : this.numSegment - 1;
+			var offset = this.boundOffset[i];
+			offset += (this.radius - offset) / 15;
+			offset += ((this.boundOffset[next] + this.boundOffset[prev]) / 2 - offset) / 3;
+			this.boundOffsetBuff[i] = this.boundOffset[i] = offset;
+		}
+	},
+
+	react: function(b) {
+		var dist = this.point.getDistance(b.point);
+		if (dist < this.radius + b.radius && dist != 0) {
+			var overlap = this.radius + b.radius - dist;
+			var direc = (this.point - b.point).normalize(overlap * 0.015);
+			this.vector += direc;
+			b.vector -= direc;
+
+			this.calcBounds(b);
+			b.calcBounds(this);
+			this.updateBounds();
+			b.updateBounds();
+		}
+	},
+
+	getBoundOffset: function(b) {
+		var diff = this.point - b;
+		var angle = (diff.angle + 180) % 360;
+		return this.boundOffset[Math.floor(angle / 360 * this.boundOffset.length)];
+	},
+
+	calcBounds: function(b) {
+		for (var i = 0; i < this.numSegment; i ++) {
+			var tp = this.getSidePoint(i);
+			var bLen = b.getBoundOffset(tp);
+			var td = tp.getDistance(b.point);
+			if (td < bLen) {
+				this.boundOffsetBuff[i] -= (bLen  - td) / 2;
+			}
+		}
+	},
+
+	getSidePoint: function(index) {
+		return this.point + this.sidePoints[index] * this.boundOffset[index];
+	},
+
+	updateBounds: function() {
+		for (var i = 0; i < this.numSegment; i ++)
+			this.boundOffset[i] = this.boundOffsetBuff[i];
+	}
+};
+
+//--------------------- main ---------------------
+
+var balls = [];
+var numBalls = 15;
+for (var i = 0; i < numBalls; i++) {
+	var position = Point.random() * view.size;
+	var vector = new Point({
+		angle: 360 * Math.random(),
+		length: Math.random() * 10
+	});
+	var radius = Math.random() * 60 + 60;
+	balls.push(new Ball(radius, position, vector));
+}
+
+function onFrame() {
+	for (var i = 0; i < balls.length - 1; i++) {
+		for (var j = i + 1; j < balls.length; j++) {
+			balls[i].react(balls[j]);
+		}
+	}
+	for (var i = 0, l = balls.length; i < l; i++) {
+		balls[i].iterate();
+	}
+}
+
+
+</script>
+</head>
+
+<body>
+<header>
+	<canvas id="myCanvas" resize style="background: none; position: fixed; width: 1405px; height: 1600px; margin-left:-5px; margin-top: -800px;z-index: 100">	</canvas>
+
+	<ul id="menu">
+			<a href="./jellingjelling1.html"><li id="m1"></li></a>
+			<a href="./jellingjelling2.html"><li id="m2"></li></a>
+				
+			</li>
+
+	</ul>
+	
+	<div id="logo"><img src="./jellinglogo.svg"></div>	
+	
+
+</header>
+<article>
+<section id="op"><p> 내마음의 평온을 되찾아 주는 힐링 액체괴물 만들기 프로젝트</p></section>
+<section id="first">
+<div id="slime1"><img src="./slime1.svg"></div>
+	<h1>첫째, 우주 액체괴물</h1>
+	<h3>우주를 닮은 액체괴물을 만들어 볼 거에요.</h3>
+	<h3>반짝반짝 오묘한 보라색을 가진 우주를 만들어봐요.</h3>
+</section>
+<section id="making">
+	<h2>준비물</h2>	
+</section>
+<div id="step">
+	<section id="s1">
+		<h2>Step1 </h2>
+		<p>물과 물풀을 볼에 넣어 줘요.</p>
+		<p>물풀은 물의 1/2 정도를 넣어요.</p>
+	</section>
+
+	<section id="s2">
+		<h2>Step2</h2>
+		<p>물풀을 섞은 물에 점토를 넣어줘요.</p>
+		<p>열심히 녹여주세요.</p>
+	</section>
+
+	<section id="s3">
+		<h2>Step3</h2>		
+		<p>소다를 한꼬집 정도로 아주 소량 넣어줘요.</p>
+	</section>
+
+	<section id="s4">
+		<h2>Step4</h2>
+		<p>렌즈 액을 적정량 넣어줘요.</p>
+		<p>섞어가면서 양을 조절해요.</p>
+	</section>
+
+	<section id="s5">
+		<h2>Step5</h2>
+		<p>보라색, 검정색, 파랑색, 분홍색</p>
+		<p>등의 잉크 혹은 물감을 넣어요.</p>
+	</section>
+	<section id="s6">
+		<h2>Step6</h2>
+		<p>파란색, 보라색 반짝이를 넣어줘요.</p>
+		<p>액체괴물을 손으로 늘려가며 반짝이를 섞어줘요</p>
+	</section>
+	<section id="s7">
+		<img src="./galaxyslime.png">
+		<h1>액체괴물 완성!</h1>
+	</section>
+	</div>
+</article>
+
+<footer>
+<p>
+	액체괴물 만들기 프로젝트 ㅣ 한경대학교 디자인학과 디지털미디어컨텐츠디자인 ㅣ 최설 ㅣ 대표번호 : 010 9703 3456</p>
+</footer>
+
+<script>
+// window.onscroll = function(){
+// 		console.log(document.body.scrollTop);
+// 		var scrollH = document.body.scrollTop;
+
+// 		if(6000> scrollH && scrollH > 0){
+// 			m1.style.background = "url(./button_univh.svg)";
+// 		}else{
+// 			m1.style.background = "url(./button_univ.svg)";
+// 		}
+
+// 		if(scrollH > 6000){
+// 			m2.style.background = "url(./button_duckh.svg)";
+// 		}else{
+// 			m2.style.background = "url(./button_duck.svg)";
+// 		}
+
+// 	}
+</script>
+</body>
